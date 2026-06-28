@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>パチスロ農林水産業</title>
+<meta name="theme-color" content="#0d0a06">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<!-- ============ タイトル画面 ============ -->
+<section id="screen-title" class="screen is-active">
+  <div class="title-wrap">
+    <div class="title-mid">
+      <h1 class="game-title">パチスロ<br>農林水産業</h1>
+    </div>
+
+    <div class="title-bottom">
+      <div class="setting-box">
+        <div class="setting-label">設定を選択（プレイ中は固定）</div>
+        <div class="setting-grid" id="setting-grid">
+          <button class="setting-btn" data-setting="1">設定1</button>
+          <button class="setting-btn" data-setting="2">設定2</button>
+          <button class="setting-btn" data-setting="3">設定3</button>
+          <button class="setting-btn" data-setting="4">設定4</button>
+          <button class="setting-btn" data-setting="5">設定5</button>
+          <button class="setting-btn" data-setting="6">設定6</button>
+        </div>
+      </div>
+
+      <button id="btn-start-game" class="btn btn-primary btn-wide">本日の営農スタート</button>
+
+      <div class="title-menu-row">
+        <button id="btn-show-history" class="btn btn-secondary">実績</button>
+        <button id="btn-open-diag" class="link-btn">PWA診断パネル</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ メインゲーム画面 ============ -->
+<section id="screen-main" class="screen">
+  <header class="main-header">
+    <div class="badge">設定<span id="display-setting">-</span></div>
+    <div class="badge">第<span id="display-spincount">0</span>/100回転</div>
+  </header>
+
+  <div class="reel-zone" id="reel-zone">
+    <div class="reel-window" id="reel-window-0"><div class="reel-strip" id="strip-0"></div></div>
+    <div class="reel-window" id="reel-window-1"><div class="reel-strip" id="strip-1"></div></div>
+    <div class="reel-window" id="reel-window-2"><div class="reel-strip" id="strip-2"></div></div>
+    <div class="payline"></div>
+    <div id="effect-overlay" class="effect-overlay"></div>
+  </div>
+
+  <div id="result-banner" class="result-banner"></div>
+
+  <button id="btn-spin" class="btn btn-spin">START</button>
+
+  <div class="funds-display">所持金　<span id="display-funds">0</span>　万円</div>
+
+  <button id="btn-quit" class="btn btn-quit">やめる</button>
+</section>
+
+<!-- ============ 実績画面 ============ -->
+<section id="screen-history" class="screen">
+  <h2 class="screen-title-h2">実績</h2>
+  <div id="history-list" class="history-list"></div>
+  <div class="history-actions">
+    <button id="btn-history-back" class="btn btn-primary">タイトルへ戻る</button>
+    <button id="btn-history-clear" class="link-btn">履歴をすべて削除</button>
+  </div>
+</section>
+
+<!-- ============ 終了モーダル ============ -->
+<div id="modal-end" class="modal hidden">
+  <div class="modal-box">
+    <h2 id="end-title">結果</h2>
+    <p id="end-message" class="end-message"></p>
+    <ul class="end-stats">
+      <li><span class="end-label">獲得金額</span><span id="end-payout" class="end-value"></span>万円</li>
+      <li><span class="end-label">投資金額</span><span id="end-bet" class="end-value"></span>万円</li>
+      <li><span class="end-label">回転数</span><span id="end-spins" class="end-value"></span>回</li>
+      <li><span class="end-label">大当たり回数</span><span id="end-jackpots" class="end-value"></span>回</li>
+    </ul>
+    <div class="modal-actions">
+      <button id="btn-end-history" class="btn btn-secondary">実績を見る</button>
+      <button id="btn-end-title" class="btn btn-primary">タイトルへ戻る</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 更新バナー ============ -->
+<div id="update-banner" class="update-banner hidden">
+  <span class="update-text">新しいバージョンが利用可能です</span>
+  <div class="update-actions">
+    <button id="btn-update-apply" class="btn-mini btn-mini-primary">更新する</button>
+    <button id="btn-update-later" class="btn-mini">あとで</button>
+  </div>
+</div>
+
+<!-- ============ PWA診断パネル ============ -->
+<div id="diag-panel" class="diag-panel hidden">
+  <div class="diag-box">
+    <div class="diag-header">
+      <h2>PWA診断パネル</h2>
+      <button id="btn-diag-close" class="diag-close">✕</button>
+    </div>
+    <div class="diag-section">
+      <h3>状態</h3>
+      <pre id="diag-summary">読み込み中...</pre>
+    </div>
+    <div class="diag-section">
+      <h3>キャッシュ済みURL一覧</h3>
+      <pre id="diag-url-list">読み込み中...</pre>
+    </div>
+    <div class="diag-section">
+      <h3>直近のキャッシュ取得 失敗詳細</h3>
+      <pre id="diag-fail-list">読み込み中...</pre>
+    </div>
+    <div class="diag-actions">
+      <button id="btn-check-update" class="btn-mini">最新版を確認</button>
+      <button id="btn-cache-now" class="btn-mini">📥 キャッシュを今すぐ手動で再取得する</button>
+      <button id="btn-diag-refresh" class="btn-mini">表示を更新</button>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
