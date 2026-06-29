@@ -6,7 +6,7 @@
 ========================================================= */
 
 // ⚠️ ファイルを更新するたびに必ずこの番号を上げること（app.js の SW_CACHE_NAME とも一致させる）
-const CACHE_NAME = "norin-suisan-slot-v2";
+const CACHE_NAME = "norin-suisan-slot-v3";
 const META_CACHE_NAME = CACHE_NAME + "-meta";
 
 // 実在するファイル名と完全一致させること。service-worker.js自身は含めない。

@@ -22,9 +22,23 @@ const CELL = (function(){
 })();
 
 const REEL_COUNT = 3;
-const REPEAT = 14; // ストリップに何セット並べるか
-const STRIP_LEN = SYMBOLS.length * REPEAT;
-const UNIT = SYMBOLS.length * CELL; // 1セット分のpx高さ（ループ単位）
+
+// リールごとに異なる絵柄の並び順（実機同様、各リールで配列が異なる）
+const REEL_ORDERS = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],         // 左リール
+  [5, 8, 2, 9, 0, 6, 3, 1, 7, 4],         // 中リール
+  [9, 3, 6, 0, 8, 1, 4, 7, 2, 5],         // 右リール
+];
+
+const REPEAT = 30; // ストリップに何セット並べるか
+const STRIP_LEN = SYMBOLS.length * REPEAT; // 1リールあたりのセル数
+const UNIT = SYMBOLS.length * CELL; // 1セット(10絵柄)分のpx高さ＝ループ単位
+
+// 「上から下」へ流れるスクロールを安全な範囲で表現するための基準値
+const BASE_INDEX = 230;  // ペイラインに表示され得る基準インデックス
+const WRAP_LOW = 130;    // これを下回ったら巻き戻す
+const WRAP_RESET = 100;  // 一度に10セット分(100セル)戻す
+const TY_BASE = CELL * (1 - BASE_INDEX); // translateY計算用の定数
 
 const BET = 3; // 1回転あたりのベット額（万円）
 const START_FUNDS = 100; // 自己資金（万円）
@@ -150,19 +164,24 @@ function showScreen(name) {
 --------------------------------------------------------- */
 function buildStrips() {
   strips.forEach((stripEl, idx) => {
+    const order = REEL_ORDERS[idx];
     let html = "";
     for (let i = 0; i < STRIP_LEN; i++) {
-      html += `<div class="symbol-cell">${SYMBOLS[i % SYMBOLS.length]}</div>`;
+      html += `<div class="symbol-cell">${SYMBOLS[order[i % order.length]]}</div>`;
     }
     stripEl.innerHTML = html;
     setReelTransform(idx, reelPos[idx], false);
   });
 }
 
+// pos（常に増加し続けるスクロール量）から、ペイラインに来るストリップ上のインデックスを求める。
+// j = BASE_INDEX - pos/CELL となるように設計しており、posが増えるほどjは減る＝
+// ストリップ全体が下方向へ流れ、絵柄が上から下に移動して見える。
 function setReelTransform(reelIdx, pos, withTransition) {
   const stripEl = strips[reelIdx];
+  const translateY = pos + TY_BASE;
   stripEl.style.transition = withTransition ? "transform .65s cubic-bezier(.18,.86,.32,1.07)" : "none";
-  stripEl.style.transform = `translateY(${CELL - pos}px)`;
+  stripEl.style.transform = `translateY(${translateY}px)`;
 }
 
 /* ---------------------------------------------------------
@@ -200,8 +219,15 @@ function randomLoseSymbols() {
 
 /* ---------------------------------------------------------
    6. リール回転エンジン
+   ※ pos は常に増加し続ける値。j = BASE_INDEX - pos/CELL が
+     ペイラインに表示されるストリップ上のインデックスとなり、
+     posが増えるほどjが減る＝絵柄が上から下へ流れて見える。
 --------------------------------------------------------- */
 const SPIN_SPEED = 1400; // px/sec
+
+function currentJ(reelIdx) {
+  return BASE_INDEX - reelPos[reelIdx] / CELL;
+}
 
 function startSpinAnim(reelIdx) {
   let last = performance.now();
@@ -209,8 +235,9 @@ function startSpinAnim(reelIdx) {
     const dt = (now - last) / 1000;
     last = now;
     reelPos[reelIdx] += SPIN_SPEED * dt;
-    if (reelPos[reelIdx] >= UNIT * 4) {
-      reelPos[reelIdx] -= UNIT * 4; // 周期的にリセット（見た目は同じ）
+    // jがWRAP_LOWを下回ったら、絵柄の周期(10個=UNIT)単位で巻き戻す（見た目は同一）
+    if (currentJ(reelIdx) < WRAP_LOW) {
+      reelPos[reelIdx] -= WRAP_RESET * CELL;
     }
     setReelTransform(reelIdx, reelPos[reelIdx], false);
     reelRAF[reelIdx] = requestAnimationFrame(frame);
@@ -218,30 +245,25 @@ function startSpinAnim(reelIdx) {
   reelRAF[reelIdx] = requestAnimationFrame(frame);
 }
 
-function stopReelAt(reelIdx, targetSymbolIndex) {
+function stopReelAt(reelIdx, targetGlobalSymbolIndex) {
   if (reelRAF[reelIdx]) {
     cancelAnimationFrame(reelRAF[reelIdx]);
     reelRAF[reelIdx] = null;
   }
-  const current = reelPos[reelIdx];
-  const currentFlat = current / CELL;
+  const order = REEL_ORDERS[reelIdx];
+  const desiredMod = order.indexOf(targetGlobalSymbolIndex); // このリール内でその絵柄がある位置(0-9)
+
+  const curJ = currentJ(reelIdx);
   const loops = 8 + reelIdx; // リールごとに微妙にループ数を変えて自然に
-  let minFlat = Math.ceil(currentFlat) + 4 + loops * SYMBOLS.length;
-  const mod = ((minFlat % SYMBOLS.length) + SYMBOLS.length) % SYMBOLS.length;
-  const diff = ((targetSymbolIndex - mod) + SYMBOLS.length) % SYMBOLS.length;
-  const targetFlat = minFlat + diff;
-  const targetPos = targetFlat * CELL;
+  const marginCells = 4 + loops * SYMBOLS.length;
+  let maxTargetJ = Math.floor(curJ) - marginCells; // 現在地より十分先(=下)で止める
+  const mod = ((maxTargetJ % SYMBOLS.length) + SYMBOLS.length) % SYMBOLS.length;
+  const diff = ((mod - desiredMod) + SYMBOLS.length) % SYMBOLS.length;
+  const targetJ = maxTargetJ - diff;
+  const targetPos = (BASE_INDEX - targetJ) * CELL;
+
   reelPos[reelIdx] = targetPos;
   setReelTransform(reelIdx, targetPos, true);
-}
-
-function normalizeReelPositions() {
-  // アイドル中にpxを小さく保つ（見た目は同一）
-  reelPos.forEach((p, i) => {
-    const normalized = p % UNIT;
-    reelPos[i] = normalized;
-    setReelTransform(i, normalized, false);
-  });
 }
 
 /* ---------------------------------------------------------
@@ -364,7 +386,6 @@ function resolveSpin(outcome) {
 
 function finishSpin(outcome) {
   clearEffect();
-  normalizeReelPositions();
 
   if (outcome.payout > 0) {
     state.funds += outcome.payout;
@@ -576,7 +597,7 @@ function initEvents() {
    12. PWA：Service Worker登録・更新バナー・診断パネル
    ※ CACHE_NAME は service-worker.js 側と必ず一致させること
 =========================================================== */
-const SW_CACHE_NAME = "norin-suisan-slot-v2"; // ⚠️ service-worker.js の CACHE_NAME と同期させる
+const SW_CACHE_NAME = "norin-suisan-slot-v3"; // ⚠️ service-worker.js の CACHE_NAME と同期させる
 const EXPECTED_ASSET_COUNT = 6; // index.html, style.css, app.js, manifest.json, icon-192.png, icon-512.png
 
 let swReg = null;
